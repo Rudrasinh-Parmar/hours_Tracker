@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0f1419" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Work Tracker" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<title>Work & Travel Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f1419;
+    color: #e6e6e6;
+    min-height: 100vh;
+    padding: 16px;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; color: #7dd3fc; }
+  .sub { font-size: 13px; color: #94a3b8; margin-bottom: 20px; }
+  .card {
+    background: #1a2332;
+    border: 1px solid #2a3547;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .card h2 { font-size: 15px; color: #7dd3fc; margin-bottom: 12px; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
+  input, select {
+    width: 100%;
+    padding: 10px;
+    background: #0f1419;
+    border: 1px solid #2a3547;
+    border-radius: 8px;
+    color: #e6e6e6;
+    font-size: 14px;
+  }
+  input:focus, select:focus { outline: none; border-color: #7dd3fc; }
+  button {
+    padding: 10px 16px;
+    background: #7dd3fc;
+    color: #0f1419;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    width: 100%;
+    margin-top: 12px;
+  }
+  button:hover { background: #38bdf8; }
+  button.ghost {
+    background: transparent;
+    color: #94a3b8;
+    border: 1px solid #2a3547;
+    padding: 6px 10px;
+    font-size: 12px;
+    width: auto;
+    margin: 0;
+  }
+  .shift {
+    background: #0f1419;
+    border: 1px solid #2a3547;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .shift-info { flex: 1; font-size: 13px; }
+  .shift-date { color: #7dd3fc; font-weight: 600; margin-bottom: 2px; }
+  .shift-meta { color: #94a3b8; font-size: 12px; }
+  .stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #2a3547;
+    font-size: 14px;
+  }
+  .stat:last-child { border: none; }
+  .stat-val { color: #7dd3fc; font-weight: 600; }
+  .stat-big { font-size: 18px; }
+  .empty { color: #64748b; text-align: center; padding: 20px; font-size: 13px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+  .tab {
+    flex: 1;
+    padding: 8px;
+    background: #0f1419;
+    border: 1px solid #2a3547;
+    color: #94a3b8;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 6px;
+  }
+  .tab.active { background: #7dd3fc; color: #0f1419; border-color: #7dd3fc; }
+  .settings-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .settings-row label { flex: 1; margin: 0; font-size: 13px; color: #e6e6e6; }
+  .settings-row input { width: 100px; }
+  .export-row { display: flex; gap: 8px; margin-top: 8px; }
+  .export-row button { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⚔️ Work & Travel Tracker</h1>
+  <div class="sub">Shifts ≥6h automatically deduct a 30min unpaid break</div>
+
+  <div class="card">
+    <h2>Settings</h2>
+    <div class="settings-row">
+      <label>Hourly wage (£)</label>
+      <input type="number" id="wage" step="0.01" value="12.71" />
+    </div>
+    <button class="ghost" onclick="saveSettings()">Save wage</button>
+    <div class="export-row">
+      <button class="ghost" onclick="exportData()">Export backup</button>
+      <button class="ghost" onclick="document.getElementById('importFile').click()">Import backup</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)" />
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Log a shift</h2>
+    <div class="grid">
+      <div>
+        <label>Date</label>
+        <input type="date" id="date" />
+      </div>
+      <div>
+        <label>Travel cost (£)</label>
+        <input type="number" id="shiftTravel" step="0.01" placeholder="0.00" />
+      </div>
+    </div>
+    <div class="grid" style="margin-top:10px;">
+      <div>
+        <label>Start time</label>
+        <input type="time" id="start" />
+      </div>
+      <div>
+        <label>End time</label>
+        <input type="time" id="end" />
+      </div>
+    </div>
+    <button onclick="addShift()">Add shift</button>
+  </div>
+
+  <div class="card">
+    <h2>Summary</h2>
+    <div class="tabs">
+      <div class="tab active" onclick="setPeriod('week', this)">This week</div>
+      <div class="tab" onclick="setPeriod('month', this)">This month</div>
+      <div class="tab" onclick="setPeriod('all', this)">All time</div>
+    </div>
+    <div id="summary"></div>
+  </div>
+
+  <div class="card">
+    <h2>Shifts</h2>
+    <div id="shifts"></div>
+  </div>
+</div>
+
+<script>
+let shifts = [];
+let settings = { wage: 12.71 };
+let period = 'week';
+
+function load() {
+  try {
+    const s = localStorage.getItem('wt_settings');
+    if (s) settings = JSON.parse(s);
+  } catch(e) {}
+  try {
+    const sh = localStorage.getItem('wt_shifts');
+    if (sh) shifts = JSON.parse(sh);
+  } catch(e) {}
+  document.getElementById('wage').value = settings.wage;
+  document.getElementById('date').valueAsDate = new Date();
+  render();
+}
+
+function saveSettings() {
+  settings.wage = parseFloat(document.getElementById('wage').value) || 0;
+  localStorage.setItem('wt_settings', JSON.stringify(settings));
+  render();
+}
+
+function saveShifts() {
+  localStorage.setItem('wt_shifts', JSON.stringify(shifts));
+}
+
+function calcHours(start, end) {
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let mins = (eh * 60 + em) - (sh * 60 + sm);
+  if (mins < 0) mins += 24 * 60;
+  let hours = mins / 60;
+  const gross = hours;
+  if (hours >= 6) hours -= 0.5;
+  return { paid: hours, gross };
+}
+
+function addShift() {
+  const date = document.getElementById('date').value;
+  const start = document.getElementById('start').value;
+  const end = document.getElementById('end').value;
+  const travelVal = document.getElementById('shiftTravel').value;
+  if (!date || !start || !end) { alert('Fill date, start, and end'); return; }
+  const travel = parseFloat(travelVal) || 0;
+  shifts.push({ id: Date.now(), date, start, end, travel });
+  shifts.sort((a,b) => b.date.localeCompare(a.date) || b.start.localeCompare(a.start));
+  saveShifts();
+  document.getElementById('start').value = '';
+  document.getElementById('end').value = '';
+  document.getElementById('shiftTravel').value = '';
+  render();
+}
+
+function updateTravel(id, val) {
+  const s = shifts.find(x => x.id === id);
+  if (s) {
+    s.travel = parseFloat(val) || 0;
+    saveShifts();
+    render();
+  }
+}
+
+function delShift(id) {
+  if (!confirm('Delete this shift?')) return;
+  shifts = shifts.filter(s => s.id !== id);
+  saveShifts();
+  render();
+}
+
+function setPeriod(p, el) {
+  period = p;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function inPeriod(dateStr) {
+  if (period === 'all') return true;
+  const d = new Date(dateStr);
+  const now = new Date();
+  if (period === 'month') {
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }
+  const day = now.getDay() || 7;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - day + 1);
+  monday.setHours(0,0,0,0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23,59,59,999);
+  return d >= monday && d <= sunday;
+}
+
+function exportData() {
+  const data = { settings, shifts, exported: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `work-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const data = JSON.parse(evt.target.result);
+      if (data.shifts) shifts = data.shifts;
+      if (data.settings) settings = data.settings;
+      saveShifts();
+      localStorage.setItem('wt_settings', JSON.stringify(settings));
+      document.getElementById('wage').value = settings.wage;
+      render();
+      alert('Backup imported!');
+    } catch(err) { alert('Invalid backup file'); }
+  };
+  reader.readAsText(file);
+}
+
+function render() {
+  const list = document.getElementById('shifts');
+  if (shifts.length === 0) {
+    list.innerHTML = '<div class="empty">No shifts logged yet</div>';
+  } else {
+    list.innerHTML = shifts.map(s => {
+      const { paid, gross } = calcHours(s.start, s.end);
+      const pay = paid * settings.wage;
+      const net = pay - s.travel;
+      const brk = gross >= 6 ? ' (−0.5h break)' : '';
+      return `<div class="shift">
+        <div class="shift-info">
+          <div class="shift-date">${s.date} · ${s.start}–${s.end}</div>
+          <div class="shift-meta">${paid.toFixed(2)}h${brk} · £${pay.toFixed(2)} pay − £${s.travel.toFixed(2)} travel = £${net.toFixed(2)}</div>
+          <div style="margin-top:6px; display:flex; align-items:center; gap:6px;">
+            <label style="margin:0; font-size:11px;">Edit travel £:</label>
+            <input type="number" step="0.01" value="${s.travel}" style="width:80px; padding:4px 6px; font-size:12px;" onchange="updateTravel(${s.id}, this.value)" />
+          </div>
+        </div>
+        <button class="ghost" onclick="delShift(${s.id})">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  const filtered = shifts.filter(s => inPeriod(s.date));
+  let totalHours = 0, totalPay = 0, totalTravel = 0;
+  filtered.forEach(s => {
+    const { paid } = calcHours(s.start, s.end);
+    totalHours += paid;
+    totalPay += paid * settings.wage;
+    totalTravel += s.travel;
+  });
+  const net = totalPay - totalTravel;
+  document.getElementById('summary').innerHTML = `
+    <div class="stat"><span>Shifts</span><span class="stat-val">${filtered.length}</span></div>
+    <div class="stat"><span>Paid hours</span><span class="stat-val">${totalHours.toFixed(2)}h</span></div>
+    <div class="stat"><span>Gross pay</span><span class="stat-val">£${totalPay.toFixed(2)}</span></div>
+    <div class="stat"><span>Travel cost</span><span class="stat-val">−£${totalTravel.toFixed(2)}</span></div>
+    <div class="stat stat-big"><span>Take home</span><span class="stat-val">£${net.toFixed(2)}</span></div>
+  `;
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+load();
+</script>
+</body>
+</html>
