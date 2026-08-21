@@ -19,7 +19,7 @@
     min-height: 100vh;
     padding: 16px;
     padding-top: max(16px, env(safe-area-inset-top));
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    padding-bottom: max(90px, calc(env(safe-area-inset-bottom) + 74px));
   }
   .wrap { max-width: 720px; margin: 0 auto; }
   h1 { font-size: 22px; margin-bottom: 4px; color: #7dd3fc; }
@@ -66,20 +66,37 @@
     width: auto;
     margin: 0;
   }
+  button.danger { background: transparent; color: #f87171; border: 1px solid #442; }
   .shift {
     background: #0f1419;
     border: 1px solid #2a3547;
     border-radius: 8px;
     padding: 12px;
     margin-bottom: 8px;
+  }
+  .shift-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    cursor: pointer;
     gap: 10px;
   }
   .shift-info { flex: 1; font-size: 13px; }
   .shift-date { color: #7dd3fc; font-weight: 600; margin-bottom: 2px; }
   .shift-meta { color: #94a3b8; font-size: 12px; }
+  .shift-edit {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #2a3547;
+  }
+  .shift.open .shift-edit { display: block; }
+  .shift-edit .grid { margin-bottom: 8px; }
+  .shift-edit input { padding: 6px 8px; font-size: 12px; }
+  .shift-edit label { font-size: 11px; }
+  .shift-edit .actions { display: flex; gap: 8px; margin-top: 8px; }
+  .shift-edit .actions button { margin: 0; padding: 6px 10px; font-size: 12px; width: auto; flex: 1; }
+  .expand-arrow { color: #94a3b8; font-size: 14px; padding: 0 4px; }
   .stat {
     display: flex;
     justify-content: space-between;
@@ -90,6 +107,7 @@
   .stat:last-child { border: none; }
   .stat-val { color: #7dd3fc; font-weight: 600; }
   .stat-big { font-size: 18px; }
+  .stat-sub { font-size: 12px; color: #64748b; padding: 2px 0 8px 12px; }
   .empty { color: #64748b; text-align: center; padding: 20px; font-size: 13px; }
   .tabs { display: flex; gap: 4px; margin-bottom: 12px; }
   .tab {
@@ -101,113 +119,366 @@
     font-size: 13px;
     cursor: pointer;
     border-radius: 6px;
+    text-align: center;
   }
   .tab.active { background: #7dd3fc; color: #0f1419; border-color: #7dd3fc; }
   .settings-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .settings-row label { flex: 1; margin: 0; font-size: 13px; color: #e6e6e6; }
-  .settings-row input { width: 100px; }
-  .export-row { display: flex; gap: 8px; margin-top: 8px; }
-  .export-row button { margin: 0; }
+  .settings-row input, .settings-row select { width: 140px; }
+  .export-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .export-row button { margin: 0; flex: 1; min-width: 130px; }
+  .ot-badge {
+    display: inline-block;
+    background: #7c2d12;
+    color: #fdba74;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    margin-left: 4px;
+  }
+  .hint { font-size: 11px; color: #64748b; margin-top: 4px; font-style: italic; }
+
+  /* collapsible dropdown */
+  details {
+    background: #0f1419;
+    border: 1px solid #2a3547;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  details > summary {
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #7dd3fc;
+    font-weight: 600;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::after {
+    content: '▼';
+    font-size: 10px;
+    color: #94a3b8;
+    transition: transform 0.2s;
+  }
+  details[open] > summary::after { transform: rotate(180deg); }
+  details > .details-body { padding: 10px 12px 12px; border-top: 1px solid #2a3547; }
+
+  /* bottom nav */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #1a2332;
+    border-top: 1px solid #2a3547;
+    display: flex;
+    padding: 8px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    gap: 4px;
+    z-index: 100;
+  }
+  .bottom-nav button {
+    flex: 1;
+    margin: 0;
+    padding: 12px 8px;
+    background: transparent;
+    color: #94a3b8;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .bottom-nav button.active {
+    background: #0f1419;
+    color: #7dd3fc;
+    border: 1px solid #2a3547;
+  }
+
+  .page { display: none; }
+  .page.active { display: block; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>⚔️ Work & Travel Tracker</h1>
-  <div class="sub">Shifts ≥6h automatically deduct a 30min unpaid break</div>
 
-  <div class="card">
-    <h2>Settings</h2>
-    <div class="settings-row">
-      <label>Hourly wage (£)</label>
-      <input type="number" id="wage" step="0.01" value="12.71" />
+  <!-- HOME PAGE -->
+  <div class="page active" id="page-home">
+    <h1>⚔️ Work & Travel Tracker</h1>
+    <div class="sub">Log shifts and see your earnings</div>
+
+    <div class="card">
+      <h2>Log a shift</h2>
+      <div class="grid">
+        <div><label>Date</label><input type="date" id="date" /></div>
+        <div><label>Travel cost (£)</label><input type="number" id="shiftTravel" step="0.01" placeholder="0.00" /></div>
+      </div>
+      <div class="grid" style="margin-top:10px;">
+        <div><label>Start time</label><input type="time" id="start" /></div>
+        <div><label>End time</label><input type="time" id="end" /></div>
+      </div>
+      <button onclick="addShift()">Add shift</button>
     </div>
-    <button class="ghost" onclick="saveSettings()">Save wage</button>
-    <div class="export-row">
-      <button class="ghost" onclick="exportData()">Export backup</button>
-      <button class="ghost" onclick="document.getElementById('importFile').click()">Import backup</button>
-      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)" />
+
+    <div class="card">
+      <h2>Summary</h2>
+      <div class="tabs">
+        <div class="tab active" onclick="setPeriod('week', this)">Week</div>
+        <div class="tab" onclick="setPeriod('month', this)">Month</div>
+        <div class="tab" onclick="setPeriod('all', this)">All</div>
+      </div>
+      <div id="summary"></div>
+    </div>
+
+    <div class="card">
+      <h2>Recent shifts <span style="float:right; font-size:12px; font-weight:normal;"><a href="#" onclick="showPage('shifts'); return false;" style="color:#7dd3fc;">View all →</a></span></h2>
+      <div id="shifts"></div>
     </div>
   </div>
 
-  <div class="card">
-    <h2>Log a shift</h2>
-    <div class="grid">
-      <div>
-        <label>Date</label>
-        <input type="date" id="date" />
+  <!-- ALL SHIFTS PAGE -->
+  <div class="page" id="page-shifts">
+    <h1>📋 All Shifts</h1>
+    <div class="sub">Search, filter, and edit your logged shifts</div>
+
+    <div class="card">
+      <h2>Search & filter</h2>
+      <div class="grid">
+        <div><label>From date</label><input type="date" id="filterFrom" onchange="renderAllShifts()" /></div>
+        <div><label>To date</label><input type="date" id="filterTo" onchange="renderAllShifts()" /></div>
       </div>
-      <div>
-        <label>Travel cost (£)</label>
-        <input type="number" id="shiftTravel" step="0.01" placeholder="0.00" />
+      <div style="margin-top:10px;">
+        <label>Search (date or time, e.g. "2026-08" or "06:30")</label>
+        <input type="text" id="filterText" placeholder="type to search..." oninput="renderAllShifts()" />
       </div>
+      <button class="ghost" onclick="clearFilters()" style="margin-top:10px;">Clear filters</button>
     </div>
-    <div class="grid" style="margin-top:10px;">
-      <div>
-        <label>Start time</label>
-        <input type="time" id="start" />
-      </div>
-      <div>
-        <label>End time</label>
-        <input type="time" id="end" />
-      </div>
+
+    <div class="card">
+      <h2>Shifts <span id="allShiftsCount" style="float:right; font-size:12px; font-weight:normal; color:#94a3b8;"></span></h2>
+      <div id="allShifts"></div>
     </div>
-    <button onclick="addShift()">Add shift</button>
   </div>
 
-  <div class="card">
-    <h2>Summary</h2>
-    <div class="tabs">
-      <div class="tab active" onclick="setPeriod('week', this)">This week</div>
-      <div class="tab" onclick="setPeriod('month', this)">This month</div>
-      <div class="tab" onclick="setPeriod('all', this)">All time</div>
+  <!-- SETTINGS PAGE -->
+  <div class="page" id="page-settings">
+    <h1>⚙️ Settings</h1>
+    <div class="sub">Wage, breaks, travel, and overtime rules</div>
+
+    <div class="card">
+      <h2>Pay & travel</h2>
+      <div class="settings-row">
+        <label>Hourly wage (£)</label>
+        <input type="number" id="wage" step="0.01" value="12.71" />
+      </div>
+      <div class="settings-row">
+        <label>Default travel (£/shift)</label>
+        <input type="number" id="defTravel" step="0.01" placeholder="0.00" />
+      </div>
+      <div class="hint">Travel auto-fills when logging a shift — still editable per shift</div>
     </div>
-    <div id="summary"></div>
+
+    <div class="card">
+      <h2>Break rule</h2>
+      <div class="settings-row">
+        <label>Break after (hrs/shift)</label>
+        <input type="number" id="brkAfter" step="0.5" placeholder="blank = never" />
+      </div>
+      <div class="settings-row">
+        <label>Break length (mins)</label>
+        <input type="number" id="brkMins" step="5" placeholder="e.g. 30" />
+      </div>
+      <div class="settings-row">
+        <label>Break is paid?</label>
+        <select id="brkPaid">
+          <option value="false">No — deduct from hours</option>
+          <option value="true">Yes — no deduction</option>
+        </select>
+      </div>
+      <div class="hint">Default for every shift. You can override per shift when editing.</div>
+    </div>
+
+    <div class="card">
+      <h2>Overtime</h2>
+      <div class="settings-row">
+        <label>OT after (hrs/week)</label>
+        <input type="number" id="otThreshold" step="0.5" placeholder="blank = N/A" />
+      </div>
+      <div class="settings-row">
+        <label>OT rate (£/hr)</label>
+        <input type="number" id="otRate" step="0.01" placeholder="e.g. 19.07" />
+      </div>
+      <div class="hint">OT applies to hours over the weekly threshold (Mon–Sun)</div>
+
+      <details style="margin-top:14px;">
+        <summary>Weekly OT overrides</summary>
+        <div class="details-body">
+          <div class="hint" style="margin-bottom:10px; margin-top:0;">Change the OT threshold just for one week (e.g. full-time weeks).</div>
+          <div id="weekOverrides"></div>
+          <div class="grid" style="margin-top:10px;">
+            <div>
+              <label>Week (any date in it)</label>
+              <input type="date" id="ovWeek" />
+            </div>
+            <div>
+              <label>OT after (hrs)</label>
+              <input type="number" id="ovHours" step="0.5" placeholder="e.g. 40" />
+            </div>
+          </div>
+          <button class="ghost" onclick="addOverride()" style="margin-top:10px;">Add / update override</button>
+        </div>
+      </details>
+    </div>
+
+    <button onclick="saveSettings()">Save all settings</button>
+
+    <div class="card" style="margin-top:20px;">
+      <h2>Export & backup</h2>
+      <div class="grid">
+        <div><label>From</label><input type="date" id="expFrom" /></div>
+        <div><label>To</label><input type="date" id="expTo" /></div>
+      </div>
+      <div class="export-row">
+        <button class="ghost" onclick="exportRange('csv')">Download CSV</button>
+        <button class="ghost" onclick="exportRange('txt')">Download Text</button>
+      </div>
+      <div class="export-row">
+        <button class="ghost" onclick="exportBackup()">Backup all data</button>
+        <button class="ghost" onclick="document.getElementById('importFile').click()">Restore backup</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importBackup(event)" />
+      </div>
+    </div>
   </div>
 
-  <div class="card">
-    <h2>Shifts</h2>
-    <div id="shifts"></div>
-  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <button id="nav-home" class="active" onclick="showPage('home')">🏠 Home</button>
+  <button id="nav-shifts" onclick="showPage('shifts')">📋 Shifts</button>
+  <button id="nav-settings" onclick="showPage('settings')">⚙️ Settings</button>
 </div>
 
 <script>
 let shifts = [];
-let settings = { wage: 12.71 };
+let settings = { wage: 12.71, defTravel: 0, otThreshold: '', otRate: 0, otOverrides: {},
+  brkAfter: 6, brkMins: 30, brkPaid: false };
 let period = 'week';
+let openShiftId = null;
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.bottom-nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-' + name).classList.add('active');
+  window.scrollTo(0, 0);
+}
 
 function load() {
   try {
     const s = localStorage.getItem('wt_settings');
-    if (s) settings = JSON.parse(s);
+    if (s) settings = { ...settings, ...JSON.parse(s) };
   } catch(e) {}
+  if (!settings.otOverrides) settings.otOverrides = {};
   try {
     const sh = localStorage.getItem('wt_shifts');
     if (sh) shifts = JSON.parse(sh);
   } catch(e) {}
   document.getElementById('wage').value = settings.wage;
+  document.getElementById('defTravel').value = settings.defTravel || '';
+  document.getElementById('brkAfter').value = settings.brkAfter ?? '';
+  document.getElementById('brkMins').value = settings.brkMins ?? '';
+  document.getElementById('brkPaid').value = String(!!settings.brkPaid);
+  document.getElementById('otThreshold').value = settings.otThreshold || '';
+  document.getElementById('otRate').value = settings.otRate || '';
   document.getElementById('date').valueAsDate = new Date();
+  document.getElementById('shiftTravel').value = settings.defTravel || '';
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  document.getElementById('expFrom').value = first.toISOString().slice(0,10);
+  document.getElementById('expTo').value = now.toISOString().slice(0,10);
   render();
 }
 
 function saveSettings() {
   settings.wage = parseFloat(document.getElementById('wage').value) || 0;
+  settings.defTravel = parseFloat(document.getElementById('defTravel').value) || 0;
+  const ba = document.getElementById('brkAfter').value;
+  const bm = document.getElementById('brkMins').value;
+  settings.brkAfter = ba === '' ? null : parseFloat(ba);
+  settings.brkMins = bm === '' ? 0 : parseFloat(bm);
+  settings.brkPaid = document.getElementById('brkPaid').value === 'true';
+  settings.otThreshold = document.getElementById('otThreshold').value;
+  settings.otRate = parseFloat(document.getElementById('otRate').value) || 0;
   localStorage.setItem('wt_settings', JSON.stringify(settings));
+  document.getElementById('shiftTravel').value = settings.defTravel || '';
+  alert('Settings saved!');
   render();
 }
 
-function saveShifts() {
-  localStorage.setItem('wt_shifts', JSON.stringify(shifts));
-}
+function saveShifts() { localStorage.setItem('wt_shifts', JSON.stringify(shifts)); }
 
-function calcHours(start, end) {
+function calcHours(start, end, shift) {
   const [sh, sm] = start.split(':').map(Number);
   const [eh, em] = end.split(':').map(Number);
   let mins = (eh * 60 + em) - (sh * 60 + sm);
   if (mins < 0) mins += 24 * 60;
-  let hours = mins / 60;
-  const gross = hours;
-  if (hours >= 6) hours -= 0.5;
-  return { paid: hours, gross };
+  const gross = mins / 60;
+  const ov = shift && shift.brkOverride;
+  const after = ov ? ov.after : settings.brkAfter;
+  const brkMins = ov ? ov.mins : settings.brkMins;
+  const brkPaid = ov ? ov.paid : settings.brkPaid;
+  let deducted = 0;
+  if (after !== null && after !== '' && !isNaN(parseFloat(after)) && gross >= parseFloat(after) && brkMins > 0 && !brkPaid) {
+    deducted = brkMins / 60;
+  }
+  return { paid: gross - deducted, gross, breakDeducted: deducted };
+}
+
+function weekKey(dateStr) {
+  const d = new Date(dateStr);
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() - day + 1);
+  return d.toISOString().slice(0,10);
+}
+
+function computeAllShiftsPay() {
+  const defaultThr = parseFloat(settings.otThreshold);
+  const otRateSet = settings.otRate > 0;
+  const result = {};
+  const weeks = {};
+  shifts.forEach(s => {
+    const k = weekKey(s.date);
+    if (!weeks[k]) weeks[k] = [];
+    weeks[k].push(s);
+  });
+  Object.entries(weeks).forEach(([wk, list]) => {
+    const override = parseFloat(settings.otOverrides[wk]);
+    const thr = !isNaN(override) ? override : defaultThr;
+    const otEnabled = thr && otRateSet;
+    const sorted = [...list].sort((a,b) =>
+      a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+    let accum = 0;
+    sorted.forEach(s => {
+      const { paid } = calcHours(s.start, s.end, s);
+      if (!otEnabled) {
+        result[s.id] = { paid, reg: paid, ot: 0,
+          regPay: paid * settings.wage, otPay: 0 };
+      } else {
+        const before = accum;
+        const after = accum + paid;
+        const regInShift = Math.max(0, Math.min(after, thr) - Math.min(before, thr));
+        const otInShift = paid - regInShift;
+        result[s.id] = {
+          paid, reg: regInShift, ot: otInShift,
+          regPay: regInShift * settings.wage,
+          otPay: otInShift * settings.otRate
+        };
+        accum = after;
+      }
+    });
+  });
+  return result;
 }
 
 function addShift() {
@@ -216,23 +487,50 @@ function addShift() {
   const end = document.getElementById('end').value;
   const travelVal = document.getElementById('shiftTravel').value;
   if (!date || !start || !end) { alert('Fill date, start, and end'); return; }
-  const travel = parseFloat(travelVal) || 0;
+  const travel = travelVal === '' ? (settings.defTravel || 0) : parseFloat(travelVal);
   shifts.push({ id: Date.now(), date, start, end, travel });
-  shifts.sort((a,b) => b.date.localeCompare(a.date) || b.start.localeCompare(a.start));
+  sortShifts();
   saveShifts();
   document.getElementById('start').value = '';
   document.getElementById('end').value = '';
-  document.getElementById('shiftTravel').value = '';
+  document.getElementById('shiftTravel').value = settings.defTravel || '';
   render();
 }
 
-function updateTravel(id, val) {
+function sortShifts() {
+  shifts.sort((a,b) => b.date.localeCompare(a.date) || b.start.localeCompare(a.start));
+}
+
+function toggleShift(id) {
+  openShiftId = openShiftId === id ? null : id;
+  render();
+}
+
+function saveShiftEdit(id) {
   const s = shifts.find(x => x.id === id);
-  if (s) {
-    s.travel = parseFloat(val) || 0;
-    saveShifts();
-    render();
+  if (!s) return;
+  const d = document.getElementById(`edit-date-${id}`).value;
+  const st = document.getElementById(`edit-start-${id}`).value;
+  const en = document.getElementById(`edit-end-${id}`).value;
+  const tr = document.getElementById(`edit-travel-${id}`).value;
+  if (!d || !st || !en) { alert('Date, start, and end required'); return; }
+  s.date = d; s.start = st; s.end = en; s.travel = parseFloat(tr) || 0;
+  const useOv = document.getElementById(`edit-brkOv-${id}`).checked;
+  if (useOv) {
+    const ba = document.getElementById(`edit-brkAfter-${id}`).value;
+    const bm = document.getElementById(`edit-brkMins-${id}`).value;
+    s.brkOverride = {
+      after: ba === '' ? null : parseFloat(ba),
+      mins: bm === '' ? 0 : parseFloat(bm),
+      paid: document.getElementById(`edit-brkPaid-${id}`).value === 'true'
+    };
+  } else {
+    delete s.brkOverride;
   }
+  sortShifts();
+  saveShifts();
+  openShiftId = null;
+  render();
 }
 
 function delShift(id) {
@@ -244,7 +542,7 @@ function delShift(id) {
 
 function setPeriod(p, el) {
   period = p;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   render();
 }
@@ -253,9 +551,7 @@ function inPeriod(dateStr) {
   if (period === 'all') return true;
   const d = new Date(dateStr);
   const now = new Date();
-  if (period === 'month') {
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  }
+  if (period === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   const day = now.getDay() || 7;
   const monday = new Date(now);
   monday.setDate(now.getDate() - day + 1);
@@ -266,18 +562,119 @@ function inPeriod(dateStr) {
   return d >= monday && d <= sunday;
 }
 
-function exportData() {
-  const data = { settings, shifts, exported: new Date().toISOString() };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+function shiftsInRange(from, to) {
+  return shifts.filter(s => s.date >= from && s.date <= to)
+    .sort((a,b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+}
+
+function addOverride() {
+  const dateStr = document.getElementById('ovWeek').value;
+  const hours = parseFloat(document.getElementById('ovHours').value);
+  if (!dateStr) { alert('Pick a date in the week'); return; }
+  const wk = weekKey(dateStr);
+  if (!hours || hours <= 0) {
+    delete settings.otOverrides[wk];
+  } else {
+    settings.otOverrides[wk] = hours;
+  }
+  localStorage.setItem('wt_settings', JSON.stringify(settings));
+  document.getElementById('ovWeek').value = '';
+  document.getElementById('ovHours').value = '';
+  render();
+}
+
+function removeOverride(wk) {
+  delete settings.otOverrides[wk];
+  localStorage.setItem('wt_settings', JSON.stringify(settings));
+  render();
+}
+
+function renderOverrides() {
+  const box = document.getElementById('weekOverrides');
+  const keys = Object.keys(settings.otOverrides).sort().reverse();
+  if (keys.length === 0) {
+    box.innerHTML = '<div class="empty" style="padding:10px;">No overrides set</div>';
+    return;
+  }
+  box.innerHTML = keys.map(wk => {
+    const monday = new Date(wk);
+    const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6);
+    const label = `Week of ${wk} → ${sunday.toISOString().slice(0,10)}`;
+    return `<div class="shift" style="margin-bottom:6px; padding:8px 12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-size:13px;">
+          <div style="color:#7dd3fc; font-weight:600;">${label}</div>
+          <div style="color:#94a3b8; font-size:12px;">OT after ${settings.otOverrides[wk]}h</div>
+        </div>
+        <button class="ghost danger" onclick="removeOverride('${wk}')">Remove</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function exportRange(fmt) {
+  const from = document.getElementById('expFrom').value;
+  const to = document.getElementById('expTo').value;
+  if (!from || !to) { alert('Pick both dates'); return; }
+  const list = shiftsInRange(from, to);
+  if (list.length === 0) { alert('No shifts in that range'); return; }
+  const payMap = computeAllShiftsPay();
+
+  let content, filename, mime;
+  if (fmt === 'csv') {
+    const rows = [['Date','Start','End','Paid hrs','Regular hrs','OT hrs','Pay','Travel','Net']];
+    let tot = {paid:0, reg:0, ot:0, pay:0, travel:0};
+    list.forEach(s => {
+      const p = payMap[s.id];
+      const pay = p.regPay + p.otPay;
+      tot.paid += p.paid; tot.reg += p.reg; tot.ot += p.ot;
+      tot.pay += pay; tot.travel += s.travel;
+      rows.push([s.date, s.start, s.end, p.paid.toFixed(2), p.reg.toFixed(2), p.ot.toFixed(2),
+        pay.toFixed(2), s.travel.toFixed(2), (pay - s.travel).toFixed(2)]);
+    });
+    rows.push(['TOTAL','','',tot.paid.toFixed(2),tot.reg.toFixed(2),tot.ot.toFixed(2),tot.pay.toFixed(2),tot.travel.toFixed(2),(tot.pay-tot.travel).toFixed(2)]);
+    content = rows.map(r => r.join(',')).join('\n');
+    filename = `shifts-${from}-to-${to}.csv`;
+    mime = 'text/csv';
+  } else {
+    let lines = [`Work shifts: ${from} to ${to}`, '='.repeat(40), ''];
+    let tot = {paid:0, pay:0, travel:0};
+    list.forEach(s => {
+      const p = payMap[s.id];
+      const pay = p.regPay + p.otPay;
+      tot.paid += p.paid; tot.pay += pay; tot.travel += s.travel;
+      lines.push(`${s.date}  ${s.start}-${s.end}`);
+      lines.push(`  ${p.paid.toFixed(2)}h paid` + (p.ot > 0 ? ` (${p.reg.toFixed(2)} reg + ${p.ot.toFixed(2)} OT)` : ''));
+      lines.push(`  Pay £${pay.toFixed(2)} - Travel £${s.travel.toFixed(2)} = £${(pay-s.travel).toFixed(2)}`);
+      lines.push('');
+    });
+    lines.push('='.repeat(40));
+    lines.push(`TOTAL: ${tot.paid.toFixed(2)}h  |  Pay £${tot.pay.toFixed(2)}  |  Travel £${tot.travel.toFixed(2)}  |  Net £${(tot.pay-tot.travel).toFixed(2)}`);
+    content = lines.join('\n');
+    filename = `shifts-${from}-to-${to}.txt`;
+    mime = 'text/plain';
+  }
+  download(content, filename, mime);
+}
+
+function download(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `work-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-function importData(e) {
+function exportBackup() {
+  const data = { settings, shifts, exported: new Date().toISOString() };
+  download(JSON.stringify(data, null, 2), `work-tracker-backup-${new Date().toISOString().slice(0,10)}.json`, 'application/json');
+}
+
+function importBackup(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -285,53 +682,131 @@ function importData(e) {
     try {
       const data = JSON.parse(evt.target.result);
       if (data.shifts) shifts = data.shifts;
-      if (data.settings) settings = data.settings;
+      if (data.settings) settings = { ...settings, ...data.settings };
       saveShifts();
       localStorage.setItem('wt_settings', JSON.stringify(settings));
-      document.getElementById('wage').value = settings.wage;
-      render();
-      alert('Backup imported!');
+      load();
+      alert('Backup restored!');
     } catch(err) { alert('Invalid backup file'); }
   };
   reader.readAsText(file);
+  e.target.value = '';
+}
+
+function renderShiftRow(s, payMap) {
+  const p = payMap[s.id];
+  const { breakDeducted } = calcHours(s.start, s.end, s);
+  const pay = p.regPay + p.otPay;
+  const net = pay - s.travel;
+  const brk = breakDeducted > 0 ? ` (−${breakDeducted.toFixed(2)}h break)` : '';
+  const otBadge = p.ot > 0 ? `<span class="ot-badge">+${p.ot.toFixed(2)}h OT</span>` : '';
+  const open = openShiftId === s.id ? 'open' : '';
+  const arrow = openShiftId === s.id ? '▲' : '▼';
+  const ov = s.brkOverride || {};
+  const useOv = !!s.brkOverride;
+  return `<div class="shift ${open}">
+    <div class="shift-header" onclick="toggleShift(${s.id})">
+      <div class="shift-info">
+        <div class="shift-date">${s.date} · ${s.start}–${s.end} ${otBadge}</div>
+        <div class="shift-meta">${p.paid.toFixed(2)}h${brk} · £${pay.toFixed(2)} − £${s.travel.toFixed(2)} = £${net.toFixed(2)}</div>
+      </div>
+      <span class="expand-arrow">${arrow}</span>
+    </div>
+    <div class="shift-edit">
+      <div class="grid">
+        <div><label>Date</label><input type="date" id="edit-date-${s.id}" value="${s.date}" /></div>
+        <div><label>Travel £</label><input type="number" step="0.01" id="edit-travel-${s.id}" value="${s.travel}" /></div>
+      </div>
+      <div class="grid">
+        <div><label>Start</label><input type="time" id="edit-start-${s.id}" value="${s.start}" /></div>
+        <div><label>End</label><input type="time" id="edit-end-${s.id}" value="${s.end}" /></div>
+      </div>
+      <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #2a3547;">
+        <label style="font-size:11px;">
+          <input type="checkbox" id="edit-brkOv-${s.id}" ${useOv ? 'checked' : ''} style="width:auto; margin-right:4px;" />
+          Override break for this shift
+        </label>
+        <div class="grid" style="margin-top:6px;">
+          <div><label>Break after (h)</label><input type="number" step="0.5" id="edit-brkAfter-${s.id}" value="${useOv ? (ov.after ?? '') : ''}" placeholder="e.g. 6" /></div>
+          <div><label>Length (min)</label><input type="number" step="5" id="edit-brkMins-${s.id}" value="${useOv ? (ov.mins ?? '') : ''}" placeholder="e.g. 30" /></div>
+        </div>
+        <div style="margin-top:6px;">
+          <label>Paid?</label>
+          <select id="edit-brkPaid-${s.id}" style="padding:6px 8px; font-size:12px;">
+            <option value="false" ${useOv && !ov.paid ? 'selected' : ''}>No (deduct)</option>
+            <option value="true" ${useOv && ov.paid ? 'selected' : ''}>Yes (no deduction)</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button onclick="saveShiftEdit(${s.id})">Save</button>
+        <button class="danger" onclick="delShift(${s.id})">Delete</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function clearFilters() {
+  document.getElementById('filterFrom').value = '';
+  document.getElementById('filterTo').value = '';
+  document.getElementById('filterText').value = '';
+  renderAllShifts();
+}
+
+function renderAllShifts() {
+  const from = document.getElementById('filterFrom').value;
+  const to = document.getElementById('filterTo').value;
+  const q = (document.getElementById('filterText').value || '').trim().toLowerCase();
+  let list = shifts.slice();
+  if (from) list = list.filter(s => s.date >= from);
+  if (to) list = list.filter(s => s.date <= to);
+  if (q) list = list.filter(s =>
+    s.date.toLowerCase().includes(q) ||
+    s.start.toLowerCase().includes(q) ||
+    s.end.toLowerCase().includes(q)
+  );
+  const box = document.getElementById('allShifts');
+  const count = document.getElementById('allShiftsCount');
+  count.textContent = `${list.length} of ${shifts.length}`;
+  if (list.length === 0) {
+    box.innerHTML = '<div class="empty">No shifts match</div>';
+    return;
+  }
+  const payMap = computeAllShiftsPay();
+  box.innerHTML = list.map(s => renderShiftRow(s, payMap)).join('');
 }
 
 function render() {
+  renderOverrides();
+  const payMap = computeAllShiftsPay();
   const list = document.getElementById('shifts');
-  if (shifts.length === 0) {
+  const recent = shifts.slice(0, 5);
+  if (recent.length === 0) {
     list.innerHTML = '<div class="empty">No shifts logged yet</div>';
   } else {
-    list.innerHTML = shifts.map(s => {
-      const { paid, gross } = calcHours(s.start, s.end);
-      const pay = paid * settings.wage;
-      const net = pay - s.travel;
-      const brk = gross >= 6 ? ' (−0.5h break)' : '';
-      return `<div class="shift">
-        <div class="shift-info">
-          <div class="shift-date">${s.date} · ${s.start}–${s.end}</div>
-          <div class="shift-meta">${paid.toFixed(2)}h${brk} · £${pay.toFixed(2)} pay − £${s.travel.toFixed(2)} travel = £${net.toFixed(2)}</div>
-          <div style="margin-top:6px; display:flex; align-items:center; gap:6px;">
-            <label style="margin:0; font-size:11px;">Edit travel £:</label>
-            <input type="number" step="0.01" value="${s.travel}" style="width:80px; padding:4px 6px; font-size:12px;" onchange="updateTravel(${s.id}, this.value)" />
-          </div>
-        </div>
-        <button class="ghost" onclick="delShift(${s.id})">✕</button>
+    list.innerHTML = recent.map(s => renderShiftRow(s, payMap)).join('');
+    if (shifts.length > 5) {
+      list.innerHTML += `<div style="text-align:center; padding:8px; font-size:12px; color:#94a3b8;">
+        Showing 5 most recent of ${shifts.length} total
       </div>`;
-    }).join('');
+    }
   }
+  renderAllShifts();
 
   const filtered = shifts.filter(s => inPeriod(s.date));
-  let totalHours = 0, totalPay = 0, totalTravel = 0;
+  let totalHours = 0, totalReg = 0, totalOT = 0, totalPay = 0, totalTravel = 0;
   filtered.forEach(s => {
-    const { paid } = calcHours(s.start, s.end);
-    totalHours += paid;
-    totalPay += paid * settings.wage;
-    totalTravel += s.travel;
+    const p = payMap[s.id];
+    totalHours += p.paid; totalReg += p.reg; totalOT += p.ot;
+    totalPay += p.regPay + p.otPay; totalTravel += s.travel;
   });
   const net = totalPay - totalTravel;
+  const otLine = totalOT > 0
+    ? `<div class="stat-sub">↳ ${totalReg.toFixed(2)}h regular + ${totalOT.toFixed(2)}h overtime</div>` : '';
   document.getElementById('summary').innerHTML = `
     <div class="stat"><span>Shifts</span><span class="stat-val">${filtered.length}</span></div>
     <div class="stat"><span>Paid hours</span><span class="stat-val">${totalHours.toFixed(2)}h</span></div>
+    ${otLine}
     <div class="stat"><span>Gross pay</span><span class="stat-val">£${totalPay.toFixed(2)}</span></div>
     <div class="stat"><span>Travel cost</span><span class="stat-val">−£${totalTravel.toFixed(2)}</span></div>
     <div class="stat stat-big"><span>Take home</span><span class="stat-val">£${net.toFixed(2)}</span></div>
