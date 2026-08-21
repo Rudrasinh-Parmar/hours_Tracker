@@ -10,6 +10,7 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icon-192.png" />
 <title>Work & Travel Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -339,6 +340,7 @@
         <div><label>To</label><input type="date" id="expTo" /></div>
       </div>
       <div class="export-row">
+        <button class="ghost" onclick="exportRange('pdf')">Download PDF</button>
         <button class="ghost" onclick="exportRange('csv')">Download CSV</button>
         <button class="ghost" onclick="exportRange('txt')">Download Text</button>
       </div>
@@ -620,6 +622,8 @@ function exportRange(fmt) {
   if (list.length === 0) { alert('No shifts in that range'); return; }
   const payMap = computeAllShiftsPay();
 
+  if (fmt === 'pdf') { exportPDF(from, to, list, payMap); return; }
+
   let content, filename, mime;
   if (fmt === 'csv') {
     const rows = [['Date','Start','End','Paid hrs','Regular hrs','OT hrs','Pay','Travel','Net']];
@@ -655,6 +659,127 @@ function exportRange(fmt) {
     mime = 'text/plain';
   }
   download(content, filename, mime);
+}
+
+function exportPDF(from, to, list, payMap) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  let y = margin;
+
+  // Header
+  doc.setFontSize(18);
+  doc.setTextColor(15, 20, 25);
+  doc.text('Work & Travel Tracker', margin, y);
+  y += 22;
+  doc.setFontSize(11);
+  doc.setTextColor(100);
+  doc.text(`Shifts from ${from} to ${to}`, margin, y);
+  y += 14;
+  doc.text(`Generated: ${new Date().toLocaleString('en-GB')}`, margin, y);
+  y += 20;
+
+  // Table header
+  const cols = [
+    { title: 'Date',    x: margin,       w: 70 },
+    { title: 'Times',   x: margin + 70,  w: 80 },
+    { title: 'Hrs',     x: margin + 150, w: 40, align: 'right' },
+    { title: 'OT',      x: margin + 190, w: 40, align: 'right' },
+    { title: 'Pay',     x: margin + 230, w: 60, align: 'right' },
+    { title: 'Travel',  x: margin + 290, w: 55, align: 'right' },
+    { title: 'Net',     x: margin + 345, w: 65, align: 'right' },
+  ];
+
+  function drawTableHeader() {
+    doc.setFillColor(26, 35, 50);
+    doc.rect(margin - 4, y - 12, pageW - 2 * margin + 8, 20, 'F');
+    doc.setFontSize(10);
+    doc.setTextColor(125, 211, 252);
+    cols.forEach(c => {
+      const x = c.align === 'right' ? c.x + c.w - 4 : c.x;
+      doc.text(c.title, x, y, { align: c.align || 'left' });
+    });
+    y += 14;
+    doc.setDrawColor(200);
+    doc.line(margin, y, pageW - margin, y);
+    y += 8;
+  }
+  drawTableHeader();
+
+  let tot = { paid: 0, reg: 0, ot: 0, pay: 0, travel: 0 };
+  doc.setFontSize(9);
+  doc.setTextColor(30);
+
+  list.forEach(s => {
+    if (y > pageH - 80) {
+      doc.addPage();
+      y = margin;
+      drawTableHeader();
+    }
+    const p = payMap[s.id];
+    const pay = p.regPay + p.otPay;
+    const net = pay - s.travel;
+    tot.paid += p.paid; tot.reg += p.reg; tot.ot += p.ot;
+    tot.pay += pay; tot.travel += s.travel;
+
+    const row = [
+      s.date,
+      `${s.start}-${s.end}`,
+      p.paid.toFixed(2),
+      p.ot > 0 ? p.ot.toFixed(2) : '-',
+      `£${pay.toFixed(2)}`,
+      `£${s.travel.toFixed(2)}`,
+      `£${net.toFixed(2)}`
+    ];
+    cols.forEach((c, i) => {
+      const x = c.align === 'right' ? c.x + c.w - 4 : c.x;
+      doc.text(row[i], x, y, { align: c.align || 'left' });
+    });
+    y += 14;
+  });
+
+  // Totals row
+  y += 4;
+  doc.setDrawColor(150);
+  doc.line(margin, y, pageW - margin, y);
+  y += 14;
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(15, 20, 25);
+  const totRow = [
+    'TOTAL',
+    `${list.length} shifts`,
+    tot.paid.toFixed(2),
+    tot.ot > 0 ? tot.ot.toFixed(2) : '-',
+    `£${tot.pay.toFixed(2)}`,
+    `£${tot.travel.toFixed(2)}`,
+    `£${(tot.pay - tot.travel).toFixed(2)}`
+  ];
+  cols.forEach((c, i) => {
+    const x = c.align === 'right' ? c.x + c.w - 4 : c.x;
+    doc.text(totRow[i], x, y, { align: c.align || 'left' });
+  });
+  y += 22;
+
+  // Summary box
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(11);
+  doc.setDrawColor(125, 211, 252);
+  doc.setFillColor(240, 249, 255);
+  doc.roundedRect(margin, y, pageW - 2 * margin, 60, 6, 6, 'FD');
+  doc.setTextColor(15, 20, 25);
+  doc.text('Take-home summary', margin + 12, y + 18);
+  doc.setFontSize(10);
+  doc.text(`Total paid hours: ${tot.paid.toFixed(2)}h` +
+    (tot.ot > 0 ? `  (${tot.reg.toFixed(2)}h regular + ${tot.ot.toFixed(2)}h overtime)` : ''),
+    margin + 12, y + 34);
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.text(`Take home: £${(tot.pay - tot.travel).toFixed(2)}`, margin + 12, y + 52);
+
+  doc.save(`shifts-${from}-to-${to}.pdf`);
 }
 
 function download(content, filename, mime) {
